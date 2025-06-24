@@ -1,0 +1,23 @@
+
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum FerriaError {
+
+    #[error("IO Error: {0}")]
+    IOError(#[from] std::io::Error),
+
+    #[error("Audio Error: {0}")]
+    AudioError(String),
+
+    #[error("Visualizer Error: {0}")]
+    VisualizerError(String),
+
+    #[error(CLI Error: {0})]
+    CliError(#[from] clap::Error),
+
+    #[error(Crossterm Error: {0})]
+    CrossteamError(#[from] Crossterm::ErrorKind),
+
+}
