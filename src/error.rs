@@ -1,5 +1,4 @@
 
-
 use std::io::ErrorKind;
 use ratatui::crossterm;
 use thiserror::Error;
@@ -19,8 +18,5 @@ pub enum FerriaError {
 
     #[error("CLIError: {0}")]
     CliError(#[from] clap::Error),
-
-    #[error("CrosstermError: {0}")]
-    CrosstermError(#[from] crossterm::Error),
 
 }
