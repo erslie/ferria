@@ -16,7 +16,7 @@ pub enum FerriaError {
     #[error("Visualizer Error: {0}")]
     VisualizerError(String),
 
-    #[error("CLIError: {0}")]
+    #[error("CLI Error: {0}")]
     CliError(#[from] clap::Error),
 
 }
