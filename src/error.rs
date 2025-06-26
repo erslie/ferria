@@ -1,8 +1,10 @@
 
-
+use std::io::ErrorKind;
+use ratatui::crossterm;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
+
 pub enum FerriaError {
 
     #[error("IO Error: {0}")]
@@ -14,10 +16,7 @@ pub enum FerriaError {
     #[error("Visualizer Error: {0}")]
     VisualizerError(String),
 
-    #[error(CLI Error: {0})]
+    #[error("CLI Error: {0}")]
     CliError(#[from] clap::Error),
-
-    #[error(Crossterm Error: {0})]
-    CrossteamError(#[from] Crossterm::ErrorKind),
 
 }
