@@ -13,6 +13,9 @@ pub enum FerriaError {
     #[error("Audio Error: {0}")]
     AudioError(String),
 
+    #[error("analyzer Error: {0}")]
+    AnalyzerError(String),
+
     #[error("Visualizer Error: {0}")]
     VisualizerError(String),
 
