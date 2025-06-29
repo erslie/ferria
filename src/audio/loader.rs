@@ -30,7 +30,10 @@ impl AudioTrack {
 
         let decoder = decode_audio_from_reader(reader)?;
 
-        metadata.duration = decoder.total_duration();
+        let calculated_duration  = decoder.total_duration();
+        println!("DEBUG: Decoder calculated duration: {:?}", calculated_duration);
+
+        metadata.duration = calculated_duration;
 
         Ok(AudioTrack { decoder, metadata })
 
