@@ -56,7 +56,7 @@ impl AudioAnalyzer {
         }
 
         for i in 0..samples.len() {
-
+        
             let  window_val = 0.5f32 * (1.0f32 - (2.0f32 * std::f32::consts::PI * i as f32 / (n - 1.0f32)).cos());
 
             samples[i] *= window_val;
@@ -192,5 +192,89 @@ impl AudioAnalyzer {
         Ok(handle)
     
     }
+
+}
+
+#[cfg(test)]
+mod test_analyzer {
+
+    use super::*;
+    use std::f32::consts::PI;
+
+    fn generate_sine_wave(freq_hz: f32, sample_rate: u32, num_samples: usize) -> Vec<f32> {
+
+        let mut samples = vec![0.0; num_samples];
+
+        for i in 0..num_samples {
+            samples[i] = (2.0 * PI * freq_hz * i as f32 / sample_rate as f32).sin(); 
+        }
+
+        samples
+
+    }
+
+    #[test]
+    fn test_audio_analyzer_new () {
+        assert!(AudioAnalyzer::new(1024, 44100).is_ok());
+        assert!(AudioAnalyzer::new(2048, 48000).is_ok());
+    }
+
+    #[test]
+    fn test_audio_analyzer_new_invalid_fft_size() {
+        assert!(AudioAnalyzer::new(1000, 44100).is_err());
+        assert!(AudioAnalyzer::new(0, 44100).is_err());
+    }
+
+    #[test]
+    fn test_analyze_sine_wave() {
+        let fft_size = 1024;
+        let sample_rate = 44100;
+        let test_freq_hz = 1000.0;
+
+        let mut analyzer = AudioAnalyzer::new(fft_size, sample_rate).unwrap();
+        let samples = generate_sine_wave(test_freq_hz, sample_rate, fft_size);
+        let spectrum_result = analyzer.analyze(&samples);
+        assert!(spectrum_result.is_ok());
+        dbg!(spectrum_result.unwrap());
+    }
+
+    #[test]
+    fn test_apply_window_function() {
+        let analyzer = AudioAnalyzer::new(1024, 44100).unwrap();
+        let mut samples = vec![1.0; 5];
+
+        analyzer.apply_window_function(&mut samples);
+
+        //Hann窓の特性として、両端はほぼ0に近く、中央が最大になるのでそれを確認
+        //正確な計算が複雑なので大体の特性をチェックで済ます
+        assert!(samples[0] < 0.1);
+        assert!(samples[4] < 0.1);
+        assert!(samples[2] > 0.9);//中央は最大(Hann窓のピークは1.0)
+        dbg!(samples);
+    }
+
+    #[test]
+    fn test_calculate_spectrum_data_basic() {
+
+        let fft_output = vec![
+            Complex::new(0.0, 0.0),//DC成分
+            Complex::new(0.1, 0.0),
+            Complex::new(0.5, 0.5),
+            Complex::new(0.2, 0.1),
+            Complex::new(0.05, 0.0),
+        ];
+
+        let analyzer = AudioAnalyzer::new(1024, 44100).unwrap();
+        let spectrum = analyzer.calculate_spectrum_data(&fft_output);
+
+        assert_eq!(spectrum.bands.len(), fft_output.len() - 1);//DC成分を除外
+
+        let max_band_val = spectrum.bands.iter().cloned().fold(0.0f32, f32::max);
+        assert!((max_band_val - 1.0).abs() < 0.001);//最大値がほぼ1.0であることを確認
+
+        let expected_max_raw_amplitude = Complex::new(0.5, 0.5).norm();
+        assert!((spectrum.max_amplitude - expected_max_raw_amplitude).abs() < 0.001);
+    }
+
 
 }
