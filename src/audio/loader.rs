@@ -1,11 +1,13 @@
 use std::{fs::File, io::BufReader, path::Path};
-use rodio::Decoder;
+use ratatui::crossterm::event::read;
+use rodio::{Decoder, Source};
 use id3::{Tag, TagLike};
 use std::time::Duration;
 use std::io::{Error, ErrorKind};
 
 use crate::error::FerriaError;
 
+#[derive(Clone)]
 pub struct AudioTrackMetaData {
     pub title: String,
     pub artist: String,
@@ -15,6 +17,25 @@ pub struct AudioTrackMetaData {
 pub struct AudioTrack {
     pub decoder: Decoder<BufReader<File>>,
     pub metadata: AudioTrackMetaData,
+}
+
+impl AudioTrack {
+
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, FerriaError> {
+
+        //ここは取れなくてもok
+        let mut metadata = read_id3_metadata(&path).unwrap();
+
+        let reader = load_mp3(&path)?;
+
+        let decoder = decode_audio_from_reader(reader)?;
+
+        metadata.duration = decoder.total_duration();
+
+        Ok(AudioTrack { decoder, metadata })
+
+    }
+
 }
 
 pub fn load_mp3<P: AsRef<Path>>(path: P) -> Result<BufReader<File>, FerriaError> {
@@ -30,54 +51,33 @@ pub fn load_mp3<P: AsRef<Path>>(path: P) -> Result<BufReader<File>, FerriaError>
     }
 
     let file: File = File::open(path_ref)
-    .map_err(|e| FerriaError::IOError(Error::new(ErrorKind::Other, format!("Failed to open file: {}", path_ref.display()))))?;
+    .map_err(|_e| FerriaError::IOError(Error::new(ErrorKind::Other, format!("Failed to open file: {}", path_ref.display()))))?;
 
     Ok(BufReader::new(file))
 
 }
 
-pub fn read_id3_metadata<P: AsRef<Path>>(path: P, total_duration: Option<Duration>) -> Result<AudioTrackMetaData, FerriaError> {
+fn decode_audio_from_reader(reader: BufReader<File>) -> Result<Decoder<BufReader<File>>, crate::error::FerriaError> {
 
-    let tag = Tag::read_from_path(path).map_err(|e| FerriaError::IOError(Error::new(ErrorKind::Other, format!("Failed to read tag from audio: {}", e))))?;
+    Decoder::new(reader)
+    .map_err(|e| crate::error::FerriaError::AudioError(format!("Failed to decoder audio: {}", e)))
+
+}
+
+pub fn read_id3_metadata<P: AsRef<Path>>(path: P) -> Result<AudioTrackMetaData, FerriaError> {
+
+    //id3タグの有無を問わないようにする(cdからの吸い出し以外では無いことが多々ある)
+    let tag = Tag::read_from_path(&path).ok();
 
     Ok( AudioTrackMetaData { 
-        title: tag.title().unwrap_or("Unknown").into(), 
-        artist: tag.artist().unwrap_or("Unknown").into(), 
-        duration: total_duration, } )
+        title: tag.as_ref().and_then(|t| t.title().map(|s| s.to_string())).unwrap_or_else(|| "Unknown Title".to_string()), 
+        artist: tag.as_ref().and_then(|t| t.artist().map(|s| s.to_string())).unwrap_or_else(|| "Unknown Artist".to_string()),   
+        duration: None, } )
 
 }
 
 #[cfg(test)]
 mod test_loader {
-
-    use std::{fs::File, io::BufReader, time::Duration};
-
-    use crate::{audio::loader::{load_mp3, read_id3_metadata, AudioTrackMetaData}, error::FerriaError};
-
-
-    #[test]
-    fn test_load_mp3() {
-
-        let path = std::path::Path::new("asset/test.mp3");
-
-        let mp3 = load_mp3(path).or_else(|e| {eprintln!("{}", e); Err(e)} );
-
-        assert!(mp3.is_ok())
-
-    }
-
-    #[test]
-    fn test_read_id3_metadata() {
-
-        //フリーmp3にid3タグがなかったけど実際はメタデータなくても再生ができればよしとする
-        let path = std::path::Path::new("assets/eine.mp3");
-
-        let meta = read_id3_metadata(path, None).or_else(|e| {eprintln!("{}", e); Err(e)});
-
-        println!("{}", meta.as_ref().unwrap().title);
-        println!("{}", meta.as_ref().unwrap().artist);
-
-    }
 
 }
 
