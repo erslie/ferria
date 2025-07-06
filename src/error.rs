@@ -10,6 +10,9 @@ pub enum FerriaError {
     #[error("IO Error: {0}")]
     IOError(#[from] std::io::Error),
 
+    #[error("APPError: {0}")]
+    APPError(String),
+
     #[error("Audio Error: {0}")]
     AudioError(String),
 
