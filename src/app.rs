@@ -1,15 +1,22 @@
+
 use crate::error::FerriaError;
+
 use crate::audio::{
     player::{AudioPlayer, PlaybackStatus},
     loader::AudioTrack,
     analyzer::{SpectrumData,AudioAnalyzer},
 };
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-    terminal::{disable_raw_mode, enable_raw_mode},
-};
-use std::fmt::format;
-use std::io::Error;
+
+use ratatui::crossterm::{event::{
+    self, 
+    Event, 
+    KeyEventKind, 
+    KeyEvent},
+     terminal::{
+        disable_raw_mode,
+        enable_raw_mode,
+    }};
+
 use std::time::Duration;
 use std::thread;
 use std::path::PathBuf;
@@ -27,13 +34,12 @@ impl FerriaApp {
     }
 
 
-
     pub fn run(&mut self) -> Result<(), FerriaError> {
 
         println!("Ferria を起動します...");
 
-        let player = AudioPlayer::new()?;
-        println!("AudioPlayer が初期化されました。"); 
+
+        let _terminal_restore_guard = TerminalRestoreGuard;
 
         let audio_file_path = PathBuf::from("assets/eine.mp3");
         println!("オーディオトラックをロード中: {:?}", audio_file_path);
@@ -44,68 +50,123 @@ impl FerriaApp {
         let (sample_tx, sample_rx) = mpsc::channel::<f32>();
         let (spectrum_tx, spectrum_rx) = mpsc::channel::<SpectrumData>();
 
-        player.play(audio_track, Some(sample_tx))?;
+        self.player.play(audio_track, Some(sample_tx))?;
 
         //sample_rateは実際はAudioPlayerのOutputStreamから取得したものを使用
         let _ = AudioAnalyzer::run_in_thread(1024, 44100, sample_rx, spectrum_tx);
 
         println!("再生を開始しました。");
 
-        let total_duration = player.get_current_metadata().and_then(|m| m.duration);
+        let start_time = std::time::Instant::now();
+        let total_duration = self.player.get_current_metadata().and_then(|m| m.duration);
 
-        if let Some(duration) = total_duration {
-            println!("再生時間: {}秒", duration.as_secs());
+        enable_raw_mode()?;
 
-            let start_time = std::time::Instant::now();
+        loop {
 
+            let status = self.player.get_status();
+            let elapsed = start_time.elapsed();
 
-            loop {
-                let status = player.get_status();
-                let elapsed = start_time.elapsed();
-                println!("現在のステータス: {:?}, 経過時間: {:?}", status, elapsed);
-
-                if status == PlaybackStatus::Stopped && elapsed > Duration::from_secs(1) {
-                    println!("再生が終了しました");
-                    break;
-                }
+            if let Some(duration) = total_duration {
                 if elapsed > duration + Duration::from_secs(2) {
                     println!("再生が予想時間を超えました。強制終了します。");
                     break;
                 }
-                thread::sleep(Duration::from_millis(500));
             }
 
-            loop {
-                if event::poll(Duration::from_millis(50)).map_err(|e| FerriaError::APPError(format!("Failed to poll event: {}", e)))? {
-                    let event = event::read().map_err(|e| FerriaError::APPError(format!("Failed to read event: {}", e)))?;
-                    
+            // println!("現在のステータス: {:?}, 経過時間: {:?}", status, elapsed);
+
+            if status == PlaybackStatus::Stopped {
+                println!("再生が終了しました");
+                break;
+            }
+
+            if event::poll(Duration::from_millis(50))? {
+
+                let event = event::read()?;
+                match event {
+                    Event::Key(event) => if !self.handle_key_event(&event) {
+                        break;
+                    },
+                    _ => {}, //リサイズなどは今後実装？
                 }
             }
-        }   
-        else {
-            println!("曲の総再生時間が不明です。50秒間再生後、終了します。");
-            thread::sleep(Duration::from_secs(50));
-            player.stop();
-            println!("再生を停止します。");
+
+            thread::sleep(Duration::from_millis(10));
         }
+
+        drop(_terminal_restore_guard);
 
         println!("Ferria 終了します。");
 
         Ok(())
     }
 
-    fn handle_key_event(event: &KeyEvent) {
+    fn handle_key_event(&self, event: &KeyEvent) -> bool {
 
-        // match event {
-        // }
+        if event.kind != KeyEventKind::Press { return true };
+
+        match event.code {
+            event::KeyCode::Char('q') => { 
+                push_key_q(&self.player);
+                false
+            },
+            event::KeyCode::Char('p') => {
+                push_key_p(&self.player);
+                true
+            },
+            event::KeyCode::Char('s') => { 
+                push_key_s(&self.player);
+                true
+            },
+            event::KeyCode::Char('c') if event.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                push_key_ctrlc(&self.player);
+                false
+            },
+            _ => true,
+        }
 
     }
 
+}
 
+pub fn push_key_q (player: &AudioPlayer) {
+
+    player.stop();
+    println!("Exit Because the 'q' key was pressed.");
+    
+}
+
+pub fn push_key_p (player: &AudioPlayer) {
+
+    let current_status = player.get_status();
+    match current_status {
+        PlaybackStatus::Playing => {
+            player.pause();
+            println!("pause.");
+        },
+        PlaybackStatus::Paused => {
+            player.resume();
+            println!("restart.");
+        },
+        _ => {},
+    }
 
 }
 
+pub fn push_key_s (player: &AudioPlayer) {
 
+    player.stop();
+    println!("stop.");
+
+}
+
+pub fn push_key_ctrlc (player: &AudioPlayer) {
+
+    player.stop();
+    println!("ctrl+c");
+
+ }
 
 struct TerminalRestoreGuard;
 impl Drop for TerminalRestoreGuard {
