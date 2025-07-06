@@ -18,6 +18,10 @@ pub enum PlaybackStatus {
     Paused,
 }
 
+const VOLUME_MAX: f32 = 1.0;
+const VOLUME_MIN: f32 = 0.0;
+const VOLUME_CHANGE_STEP: f32 = 0.1;
+
 //rodio::Sourceのサンプルを別のチャネルに転送するためのラッパー
 pub struct SampleForwarder<T>
 where T: Source + Send + 'static,
@@ -185,6 +189,20 @@ impl AudioPlayer {
 
     }
 
+    pub fn volume(&self) -> f32 {
+        round_to_one_decimal_place(self.sink.volume())
+    }
+
+    pub fn volume_up(&self) {
+        let new_vol = (self.volume() + VOLUME_CHANGE_STEP).min(VOLUME_MAX);
+        self.sink.set_volume(new_vol);
+    }
+
+    pub fn volume_down(&self) {
+        let new_vol = (self.volume() - VOLUME_CHANGE_STEP).max(VOLUME_MIN);
+        self.sink.set_volume(new_vol);
+    }
+
     pub fn get_status(&self) -> PlaybackStatus {
 
         let guard = self.status.lock().unwrap();
@@ -201,6 +219,10 @@ impl AudioPlayer {
         self.current_meta_data.lock().unwrap().clone()
     }
 
+}
+
+fn round_to_one_decimal_place(value: f32) -> f32 {
+    (value *10.0).round() / 10.0
 }
 
 #[cfg(test)]

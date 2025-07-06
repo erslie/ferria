@@ -1,4 +1,5 @@
 
+use crate::audio::analyzer;
 use crate::error::FerriaError;
 
 use crate::audio::{
@@ -53,7 +54,7 @@ impl FerriaApp {
         self.player.play(audio_track, Some(sample_tx))?;
 
         //sample_rateは実際はAudioPlayerのOutputStreamから取得したものを使用
-        let _ = AudioAnalyzer::run_in_thread(1024, 44100, sample_rx, spectrum_tx);
+        let handle_analyzer = AudioAnalyzer::run_in_thread(1024, 44100, sample_rx, spectrum_tx);
 
         println!("再生を開始しました。");
 
@@ -119,6 +120,14 @@ impl FerriaApp {
                 push_key_s(&self.player);
                 true
             },
+            event::KeyCode::Char('+') => {
+                push_key_plus(&self.player);
+                true
+            }
+            event::KeyCode::Char('-') => {
+                push_key_minus(&self.player);
+                true
+            }
             event::KeyCode::Char('c') if event.modifiers.contains(event::KeyModifiers::CONTROL) => {
                 push_key_ctrlc(&self.player);
                 false
@@ -164,9 +173,21 @@ pub fn push_key_s (player: &AudioPlayer) {
 pub fn push_key_ctrlc (player: &AudioPlayer) {
 
     player.stop();
-    println!("ctrl+c");
+    println!("Ctrl+c");
 
- }
+}
+
+pub fn push_key_plus(player: &AudioPlayer) {
+
+    player.volume_up();
+    println!("volume up:{}", player.volume());
+}
+
+pub fn push_key_minus(player: &AudioPlayer) {
+
+    player.volume_down();
+    println!("volume down:{}", player.volume());
+}
 
 struct TerminalRestoreGuard;
 impl Drop for TerminalRestoreGuard {
