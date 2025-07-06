@@ -103,34 +103,29 @@ impl FerriaApp {
         Ok(())
     }
 
+    //true->loop continue / false->break;
     fn handle_key_event(&self, event: &KeyEvent) -> bool {
 
         if event.kind != KeyEventKind::Press { return true };
 
         match event.code {
-            event::KeyCode::Char('q') => { 
-                push_key_q(&self.player);
-                false
-            },
+            event::KeyCode::Enter |
+            event::KeyCode::Char(' ') |
             event::KeyCode::Char('p') => {
-                push_key_p(&self.player);
-                true
+                push_key_turn(&self.player)
             },
             event::KeyCode::Char('s') => { 
-                push_key_s(&self.player);
-                true
+                push_key_stop(&self.player)
             },
             event::KeyCode::Char('+') => {
-                push_key_plus(&self.player);
-                true
+                push_key_volume_up(&self.player)
             }
             event::KeyCode::Char('-') => {
-                push_key_minus(&self.player);
-                true
+                push_key_volume_down(&self.player)
             }
+            event::KeyCode::Char('q') |
             event::KeyCode::Char('c') if event.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                push_key_ctrlc(&self.player);
-                false
+                push_key_kill(&self.player)
             },
             _ => true,
         }
@@ -139,14 +134,7 @@ impl FerriaApp {
 
 }
 
-pub fn push_key_q (player: &AudioPlayer) {
-
-    player.stop();
-    println!("Exit Because the 'q' key was pressed.");
-    
-}
-
-pub fn push_key_p (player: &AudioPlayer) {
+pub fn push_key_turn(player: &AudioPlayer) -> bool {
 
     let current_status = player.get_status();
     match current_status {
@@ -161,37 +149,33 @@ pub fn push_key_p (player: &AudioPlayer) {
         _ => {},
     }
 
+    true
 }
 
-pub fn push_key_s (player: &AudioPlayer) {
-
+pub fn push_key_stop(player: &AudioPlayer) -> bool {
     player.stop();
-    println!("stop.");
-
+    true
 }
-
-pub fn push_key_ctrlc (player: &AudioPlayer) {
-
-    player.stop();
-    println!("Ctrl+c");
-
-}
-
-pub fn push_key_plus(player: &AudioPlayer) {
-
+ 
+pub fn push_key_volume_up(player: &AudioPlayer) -> bool {
     player.volume_up();
-    println!("volume up:{}", player.volume());
+    true
 }
 
-pub fn push_key_minus(player: &AudioPlayer) {
-
+pub fn push_key_volume_down(player: &AudioPlayer) -> bool {
     player.volume_down();
-    println!("volume down:{}", player.volume());
+    true
+}
+
+pub fn push_key_kill(player: &AudioPlayer) -> bool {
+    player.stop();
+    false
 }
 
 struct TerminalRestoreGuard;
 impl Drop for TerminalRestoreGuard {
     fn drop(&mut self) {
+
         if let Err(e) = disable_raw_mode() {
             eprintln!("Failed to disable raw mode: {}", e);
         }
