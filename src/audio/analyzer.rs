@@ -1,14 +1,13 @@
 
 use realfft::num_complex::Complex;
-use realfft::{RealFftPlanner, ComplexToReal};
-use rodio::buffer::SamplesBuffer;
-use rodio::cpal::SampleRate;
+use realfft::RealFftPlanner;
+use std::fmt::format;
+use std::path::Display;
 use std::vec::Vec;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use crate::audio::analyzer;
 use crate::error::FerriaError;
 
 //オーディオサンプルを分析して、周波数スペクトルを生成
@@ -21,7 +20,7 @@ pub struct AudioAnalyzer {
 //分析結果として得られるスペクトルデータ
 #[derive(Debug, Clone)]
 pub struct SpectrumData {
-    pub bands: Vec<f32>,
+    pub bins: Vec<f32>,
     pub max_amplitude: f32,
 }
 
@@ -104,7 +103,7 @@ impl AudioAnalyzer {
         //現状は線形スケールの振幅をそのまま返す
 
         SpectrumData { 
-            bands, 
+            bins: bands, 
             max_amplitude,
         }
 
@@ -267,9 +266,9 @@ mod test_analyzer {
         let analyzer = AudioAnalyzer::new(1024, 44100).unwrap();
         let spectrum = analyzer.calculate_spectrum_data(&fft_output);
 
-        assert_eq!(spectrum.bands.len(), fft_output.len() - 1);//DC成分を除外
+        assert_eq!(spectrum.bins.len(), fft_output.len() - 1);//DC成分を除外
 
-        let max_band_val = spectrum.bands.iter().cloned().fold(0.0f32, f32::max);
+        let max_band_val = spectrum.bins.iter().cloned().fold(0.0f32, f32::max);
         assert!((max_band_val - 1.0).abs() < 0.001);//最大値がほぼ1.0であることを確認
 
         let expected_max_raw_amplitude = Complex::new(0.5, 0.5).norm();

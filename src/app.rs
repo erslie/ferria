@@ -1,13 +1,18 @@
 
 use crate::audio::analyzer;
 use crate::error::FerriaError;
+use crate::visualizer;
 
 use crate::audio::{
     player::{AudioPlayer, PlaybackStatus},
     loader::AudioTrack,
     analyzer::{SpectrumData,AudioAnalyzer},
 };
+use crate::visualizer::visualizer::SpectrumVisualizer;
 
+use id3::frame;
+use ratatui::crossterm::execute;
+use ratatui::crossterm::terminal::{Clear, ClearType, EnterAlternateScreen};
 use ratatui::crossterm::{event::{
     self, 
     Event, 
@@ -17,6 +22,8 @@ use ratatui::crossterm::{event::{
         disable_raw_mode,
         enable_raw_mode,
     }};
+use ratatui::prelude::{Backend, CrosstermBackend};
+use ratatui::Terminal;
 
 use std::time::Duration;
 use std::thread;
@@ -39,8 +46,19 @@ impl FerriaApp {
 
         println!("Ferria を起動します...");
 
+        let mut stdout = std::io::stdout();
+        execute!(stdout, EnterAlternateScreen)?;
+        execute!(stdout, Clear(ClearType::All))?;
 
         let _terminal_restore_guard = TerminalRestoreGuard;
+
+        //ratatuiのセットアップ
+        let backend = CrosstermBackend::new(&stdout);
+        let mut terminal = Terminal::new(backend)?;
+
+        let visualizer = SpectrumVisualizer::new();
+
+        let mut last_spectrum_data: Option<SpectrumData> = None;
 
         let audio_file_path = PathBuf::from("assets/eine.mp3");
         println!("オーディオトラックをロード中: {:?}", audio_file_path);
@@ -61,8 +79,6 @@ impl FerriaApp {
         let start_time = std::time::Instant::now();
         let total_duration = self.player.get_current_metadata().and_then(|m| m.duration);
 
-        enable_raw_mode()?;
-
         loop {
 
             let status = self.player.get_status();
@@ -74,6 +90,16 @@ impl FerriaApp {
                     break;
                 }
             }
+
+            while let Ok(data) = spectrum_rx.try_recv() {
+                last_spectrum_data = Some(data);
+            }
+            
+            terminal.draw(|frame| {
+                let area = frame.area();
+                visualizer.draw(frame, area, last_spectrum_data.as_ref());
+
+            })?;
 
             // println!("現在のステータス: {:?}, 経過時間: {:?}", status, elapsed);
 
@@ -97,7 +123,6 @@ impl FerriaApp {
         }
 
         drop(_terminal_restore_guard);
-
         println!("Ferria 終了します。");
 
         Ok(())
