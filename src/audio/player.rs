@@ -1,15 +1,11 @@
 
 
-use rodio::{Decoder, OutputStream, Sample, Sink, Source};
-use std::fs::File;
-use std::io::BufReader;
+use rodio::{OutputStream, Sample, Sink, Source};
 use std::sync::{mpsc, Arc, Mutex};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use crate::audio;
 use crate::error::FerriaError;
 use crate::audio::loader::{AudioTrack, AudioTrackMetaData};
-use crate::audio::analyzer::SpectrumData;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlaybackStatus {
@@ -228,12 +224,7 @@ fn round_to_one_decimal_place(value: f32) -> f32 {
 #[cfg(test)]
 mod test {
 
-    use crate::audio::{loader, player};
-
     use super::*;
-    use std::io::Cursor;
-    use rodio::source::SineWave;
-    use std::thread;
     
     fn load_mp3() -> AudioTrack {
 
