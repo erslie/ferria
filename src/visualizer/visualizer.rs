@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 use crate::audio::analyzer::SpectrumData;
+use crate::visualizer::visualize_color;
 
 pub struct SpectrumVisualizer;
 
@@ -119,18 +120,9 @@ impl SpectrumVisualizer {
 
 fn get_bar_color(index: usize, total_bars: usize) -> Color {
     let ratio = index as f32 / total_bars as f32;
-    if ratio < 0.3 {
-        Color::Blue //低周波数
-    }
-    else if ratio < 0.6 {
-        Color::Green //中周波
-    }
-    else if ratio < 0.9 {
-        Color::Yellow //高周波
-    }
-    else {
-        Color::Red //超高周波
-    }
+    let rgb = visualize_color::float_to_rgb_palette(ratio);
+    
+    Color::Rgb(rgb.0, rgb.1, rgb.2)
 }
 
 
