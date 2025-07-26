@@ -7,8 +7,14 @@ use ratatui::{
 };
 
 use crate::audio::analyzer::SpectrumData;
+use crate::visualizer::visualize_color;
 
 pub struct SpectrumVisualizer;
+
+const MIN_DB: f32 = -60.0;
+const MAX_DB: f32 = 0.0;
+const DB_RANGE: f32 = MAX_DB - MIN_DB;
+
 
 impl SpectrumVisualizer {
 
@@ -70,7 +76,23 @@ impl SpectrumVisualizer {
                 let x = inner_area.left() + i as u16; //各種1文字幅
                 if x >= inner_area.right() { continue; } //描画領域超えたらスキップ
 
-                let bar_height = (magnitude * max_height).min(max_height) as u16;
+                let mut scaled_magnitude = 0.0;
+
+                if magnitude > 0.0 {
+                    //デシベル値に変換
+                    let db_value = 20.0 * magnitude.log10();
+                    //デシベル値をminからmaxの範囲で正規化
+                    scaled_magnitude = ((db_value - MIN_DB) /DB_RANGE).max(0.0).min(1.0);
+                }
+
+                //正規化された振幅を最大高さにマッピング
+                let bar_height_float = (scaled_magnitude * max_height).min(max_height);
+
+                let mut bar_height = bar_height_float as u16;
+                if bar_height == 0 && magnitude > 0.0 {
+                    bar_height = 1;
+                }
+
                 let y = inner_area.bottom().saturating_sub(bar_height);
 
                 let color = get_bar_color(i, bins_to_process.len());
@@ -119,18 +141,9 @@ impl SpectrumVisualizer {
 
 fn get_bar_color(index: usize, total_bars: usize) -> Color {
     let ratio = index as f32 / total_bars as f32;
-    if ratio < 0.3 {
-        Color::Blue //低周波数
-    }
-    else if ratio < 0.6 {
-        Color::Green //中周波
-    }
-    else if ratio < 0.9 {
-        Color::Yellow //高周波
-    }
-    else {
-        Color::Red //超高周波
-    }
+    let rgb = visualize_color::float_to_rgb_palette(ratio);
+    
+    Color::Rgb(rgb.0, rgb.1, rgb.2)
 }
 
 
