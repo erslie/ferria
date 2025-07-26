@@ -11,6 +11,11 @@ use crate::visualizer::visualize_color;
 
 pub struct SpectrumVisualizer;
 
+const MIN_DB: f32 = -60.0;
+const MAX_DB: f32 = 0.0;
+const DB_RANGE: f32 = MAX_DB - MIN_DB;
+
+
 impl SpectrumVisualizer {
 
     pub fn new() -> Self {
@@ -71,7 +76,23 @@ impl SpectrumVisualizer {
                 let x = inner_area.left() + i as u16; //各種1文字幅
                 if x >= inner_area.right() { continue; } //描画領域超えたらスキップ
 
-                let bar_height = (magnitude * max_height).min(max_height) as u16;
+                let mut scaled_magnitude = 0.0;
+
+                if magnitude > 0.0 {
+                    //デシベル値に変換
+                    let db_value = 20.0 * magnitude.log10();
+                    //デシベル値をminからmaxの範囲で正規化
+                    scaled_magnitude = ((db_value - MIN_DB) /DB_RANGE).max(0.0).min(1.0);
+                }
+
+                //正規化された振幅を最大高さにマッピング
+                let bar_height_float = (scaled_magnitude * max_height).min(max_height);
+
+                let mut bar_height = bar_height_float as u16;
+                if bar_height == 0 && magnitude > 0.0 {
+                    bar_height = 1;
+                }
+
                 let y = inner_area.bottom().saturating_sub(bar_height);
 
                 let color = get_bar_color(i, bins_to_process.len());
