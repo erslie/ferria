@@ -6,10 +6,12 @@ use ratatui::{
     style::{Style, Color},
 };
 
-use crate::audio::analyzer::SpectrumData;
+use crate::{audio::analyzer::SpectrumData, visualizer::{self, visualize_color::get_grayish_color}};
 use crate::visualizer::visualize_color;
 
-pub struct SpectrumVisualizer;
+pub struct SpectrumVisualizer {
+    prev_bar_heights: Vec<u16>,
+}
 
 const MIN_DB: f32 = -60.0;
 const MAX_DB: f32 = 0.0;
@@ -19,10 +21,12 @@ const DB_RANGE: f32 = MAX_DB - MIN_DB;
 impl SpectrumVisualizer {
 
     pub fn new() -> Self {
-        SpectrumVisualizer {}
+        SpectrumVisualizer {
+            prev_bar_heights: Vec::new(),
+        }
     }
 
-    pub fn draw(&self, frame: &mut Frame, area: Rect, spectrum_data: Option<&SpectrumData>) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, spectrum_data: Option<&SpectrumData>) {
 
         //ヴィジュアライザーのブロックを作成
         let block = Block::default()
@@ -31,16 +35,29 @@ impl SpectrumVisualizer {
 
         frame.render_widget(&block, area);
 
+        let full_area = frame.area();
+
         //棒グラフを描画する内部の描画エリアを計算
-        let inner_area = block.inner(area);
+        let visualizer_width_percentage = 0.80;
+        let visualizer_height_percentage = 0.50;
+
+        let visualizer_width = (full_area.width as f32 * visualizer_width_percentage) as u16;
+        let visualizer_height = (full_area.height as f32 * visualizer_height_percentage) as u16;
+
+        let visualizer_x = full_area.left() + (full_area.width.saturating_sub(visualizer_width)) / 2;
+        let visualizer_y = full_area.top() + (full_area.height.saturating_sub(visualizer_height)) / 2;
+
+        let visualizer_area = Rect::new(visualizer_x, visualizer_y, visualizer_width, visualizer_height);
+
+        let num_display_bars = visualizer_area.width as usize;
+        let mut current_bar_heights = vec![0u16; num_display_bars];
 
         if let Some(data) = spectrum_data {
+
             let raw_bins = &data.bins;
             if raw_bins.is_empty() {
                 return;
             }
-
-            let num_display_bars = inner_area.width as usize;
 
             let bins_to_process = if raw_bins.len() <= num_display_bars {
                 raw_bins.clone()
@@ -69,12 +86,30 @@ impl SpectrumVisualizer {
                 aggregated_bins
             };
 
-            let max_height = inner_area.height as f32;
+            let max_height = visualizer_area.height as f32;
+
+            if self.prev_bar_heights.len() != num_display_bars {
+                self.prev_bar_heights.resize(num_display_bars, 0);
+            }
+
+            for i in 0..num_display_bars {
+                let x = visualizer_area.left() + i as u16;
+                if x >= visualizer_area.right() { continue; }
+
+                let prev_height = self.prev_bar_heights[i];
+                let y_prev = visualizer_area.bottom().saturating_sub(prev_height);
+                let original_color = get_bar_color(i, num_display_bars);
+                let grayish_color = get_grayish_color(original_color);
+
+                for h in 0..prev_height {
+                    frame.buffer_mut().set_style(Rect::new(x, y_prev + h, 1, 1), Style::default().bg(grayish_color));
+                }
+            }
 
             for (i, &magnitude) in bins_to_process.iter().enumerate() {
 
-                let x = inner_area.left() + i as u16; //各種1文字幅
-                if x >= inner_area.right() { continue; } //描画領域超えたらスキップ
+                let x = visualizer_area.left() + i as u16; //各種1文字幅
+                if x >= visualizer_area.right() { continue; } //描画領域超えたらスキップ
 
                 let mut scaled_magnitude = 0.0;
 
@@ -93,7 +128,9 @@ impl SpectrumVisualizer {
                     bar_height = 1;
                 }
 
-                let y = inner_area.bottom().saturating_sub(bar_height);
+                current_bar_heights[i] = bar_height;
+
+                let y = visualizer_area.bottom().saturating_sub(bar_height);
 
                 let color = get_bar_color(i, bins_to_process.len());
 
@@ -103,6 +140,9 @@ impl SpectrumVisualizer {
                 }
             }
         }
+
+        self.prev_bar_heights = current_bar_heights;
+
     }
 
     #[cfg(test)]
@@ -145,8 +185,6 @@ fn get_bar_color(index: usize, total_bars: usize) -> Color {
     
     Color::Rgb(rgb.0, rgb.1, rgb.2)
 }
-
-
 
 
 #[cfg(test)]
