@@ -10,7 +10,6 @@ use crate::audio::{
 };
 use crate::visualizer::visualizer::SpectrumVisualizer;
 
-use id3::frame;
 use ratatui::crossterm::execute;
 use ratatui::crossterm::terminal::{Clear, ClearType, EnterAlternateScreen};
 use ratatui::crossterm::{event::{
@@ -22,6 +21,7 @@ use ratatui::crossterm::{event::{
         disable_raw_mode,
         enable_raw_mode,
     }};
+use ratatui::layout::{Constraint, Layout};
 use ratatui::prelude::{Backend, CrosstermBackend};
 use ratatui::Terminal;
 
@@ -56,7 +56,7 @@ impl FerriaApp {
         let backend = CrosstermBackend::new(&stdout);
         let mut terminal = Terminal::new(backend)?;
 
-        let visualizer = SpectrumVisualizer::new();
+        let mut visualizer = SpectrumVisualizer::new();
 
         let mut last_spectrum_data: Option<SpectrumData> = None;
 
@@ -126,7 +126,7 @@ impl FerriaApp {
         println!("Ferria 終了します。");
 
         Ok(())
-    }
+    } 
 
     //true->loop continue / false->break;
     fn handle_key_event(&self, event: &KeyEvent) -> bool {
